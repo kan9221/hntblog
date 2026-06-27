@@ -1,0 +1,19 @@
+{
+  "name": "ひなブログ",
+  "short_name": "ひなブログ",
+  "description": "日向坂46 公式ブログ アーカイブリーダー",
+  "start_url": "./Hinatazaka_blog_mobile.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAFAF8",
+  "theme_color": "#1A1714",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231A1714'/><text x='50' y='72' text-anchor='middle' font-size='60'>📖</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

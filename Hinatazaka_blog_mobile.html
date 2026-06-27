@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ひなブログ">
+<meta name="theme-color" content="#1A1714">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231A1714'/><text x='50' y='72' text-anchor='middle' font-size='60'>📖</text></svg>">
+<title>ひなブログ</title>
+<style>
+:root {
+  --bg:        #FAFAF8;
+  --bg2:       #F2F0ED;
+  --ink:       #1A1714;
+  --ink2:      #6B6460;
+  --ink3:      #A09890;
+  --rule:      #E0DBD5;
+  --accent:    #C0624A;
+  --accent-bg: #F5E8E4;
+  --sage:      #8FA88A;
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --tab-h:     56px;
+  --header-h:  52px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  height: 100%; width: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", Georgia, serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* ─── Layout shell ─────────────────────────────────────────── */
+#app {
+  display: flex; flex-direction: column;
+  height: 100dvh;
+  max-width: 430px; /* iPhone max */
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ─── Top header ───────────────────────────────────────────── */
+.top-bar {
+  flex-shrink: 0;
+  height: calc(var(--header-h) + var(--safe-top));
+  padding-top: var(--safe-top);
+  background: var(--bg);
+  border-bottom: 1px solid var(--rule);
+  display: flex; align-items: flex-end;
+  padding-left: 18px; padding-right: 18px; padding-bottom: 10px;
+  gap: 10px;
+  position: relative;
+  z-index: 10;
+}
+
+.top-bar h1 {
+  font-size: 20px; font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0; flex: 1;
+  color: var(--ink);
+}
+
+.top-bar .load-btn {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 11px; letter-spacing: 0.03em;
+  background: var(--ink); color: var(--bg);
+  border: none; border-radius: 6px;
+  padding: 6px 11px; cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ─── Screens ──────────────────────────────────────────────── */
+.screens { flex: 1; overflow: hidden; position: relative; }
+
+.screen {
+  position: absolute; inset: 0;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: none;
+}
+.screen.active { display: block; }
+
+/* ─── Tab bar ──────────────────────────────────────────────── */
+.tab-bar {
+  flex-shrink: 0;
+  height: calc(var(--tab-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: rgba(250,250,248,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--rule);
+  display: flex; align-items: flex-start;
+  padding-top: 8px;
+}
+
+.tab {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 3px;
+  background: none; border: none; cursor: pointer;
+  padding: 0;
+}
+.tab .tab-icon { font-size: 22px; line-height: 1; }
+.tab .tab-label {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 9px; letter-spacing: 0.06em;
+  color: var(--ink3);
+  text-transform: uppercase;
+}
+.tab.active .tab-label { color: var(--accent); }
+.tab.active .tab-icon { filter: none; }
+.tab:not(.active) .tab-icon { opacity: 0.4; }
+
+/* ─── Loading / Empty states ───────────────────────────────── */
+.state-msg {
+  padding: 60px 24px 24px;
+  text-align: center;
+  font-size: 15px; color: var(--ink2);
+  line-height: 1.7;
+}
+.state-msg .state-icon { font-size: 40px; margin-bottom: 14px; }
+.state-msg strong { color: var(--ink); display: block; margin-bottom: 6px; font-size: 17px; }
+
+/* ─── Member colour tags ───────────────────────────────────── */
+/* Each member gets a subtle hue derived from their name.
+   We pre-define 12 hue stops and assign by index. */
+.mtag {
+  display: inline-block;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 10px; letter-spacing: 0.04em;
+  padding: 2px 7px; border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* ─── Post card ────────────────────────────────────────────── */
+.post-list { padding: 0 0 16px; }
+
+.post-card {
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  background: var(--bg);
+  transition: background 0.1s;
+  -webkit-user-select: none;
+}
+.post-card:active { background: var(--bg2); }
+
+.card-top {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 6px;
+}
+.card-date {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 11px; color: var(--ink3);
+  letter-spacing: 0.02em;
+}
+.card-bookmark-btn {
+  margin-left: auto;
+  background: none; border: none;
+  font-size: 17px; cursor: pointer; padding: 0;
+  color: var(--ink3); line-height: 1;
+}
+.card-bookmark-btn.saved { color: var(--accent); }
+
+.card-title {
+  font-size: 16px; font-weight: 600;
+  line-height: 1.35; color: var(--ink);
+  margin-bottom: 5px;
+}
+.card-snippet {
+  font-size: 13px; color: var(--ink2);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-snippet mark {
+  background: none; color: var(--accent); font-weight: 700;
+}
+
+/* ─── HOME screen ──────────────────────────────────────────── */
+.member-scroll {
+  display: flex; gap: 8px; overflow-x: auto;
+  padding: 12px 18px;
+  scrollbar-width: none;
+}
+.member-scroll::-webkit-scrollbar { display: none; }
+
+.member-chip {
+  flex-shrink: 0;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 12px; padding: 6px 13px;
+  border-radius: 16px; border: 1px solid var(--rule);
+  background: var(--bg); color: var(--ink2);
+  cursor: pointer; white-space: nowrap;
+  transition: all 0.12s;
+}
+.member-chip.active {
+  background: var(--ink); color: var(--bg);
+  border-color: var(--ink);
+}
+
+.section-label {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink3);
+  padding: 10px 18px 4px;
+  border-top: 1px solid var(--rule);
+}
+
+/* ─── SEARCH screen ────────────────────────────────────────── */
+.search-bar-wrap {
+  padding: 12px 18px 10px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--rule);
+  position: sticky; top: 0; z-index: 5;
+}
+.search-input-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg2);
+  border-radius: 10px; padding: 8px 12px;
+}
+.search-input-row .search-icon { font-size: 15px; flex-shrink: 0; }
+.search-input-row input {
+  flex: 1; border: none; background: none;
+  font-family: "Hiragino Mincho ProN", Georgia, serif;
+  font-size: 16px; color: var(--ink);
+  outline: none;
+}
+.search-input-row input::placeholder { color: var(--ink3); }
+.search-input-row .clear-btn {
+  background: none; border: none; font-size: 16px;
+  color: var(--ink3); cursor: pointer; padding: 0;
+  display: none;
+}
+.search-input-row .clear-btn.visible { display: block; }
+
+.search-meta {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 11px; color: var(--ink3);
+  padding: 8px 18px 4px;
+}
+
+/* ─── Search member filter ─────────────────────────────────── */
+.filter-toggle {
+  width: 100%; background: none; border: none;
+  border-bottom: 1px solid var(--rule);
+  padding: 10px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink3); cursor: pointer;
+  text-align: left;
+}
+.filter-toggle .filter-chevron { transition: transform 0.2s; }
+.filter-toggle.open .filter-chevron { transform: rotate(180deg); }
+.filter-toggle .filter-badge {
+  background: var(--accent); color: #fff;
+  border-radius: 8px; padding: 1px 6px; font-size: 10px;
+  margin-left: 6px; display: none;
+}
+.filter-toggle .filter-badge.visible { display: inline; }
+
+.filter-panel {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--rule);
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.25s ease;
+}
+.filter-panel.open { max-height: 400px; }
+
+.filter-inner {
+  padding: 10px 18px 14px;
+}
+
+.filter-actions {
+  display: flex; gap: 10px; margin-bottom: 10px;
+}
+.filter-actions button {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 11px; letter-spacing: 0.03em;
+  background: none; border: 1px solid var(--rule);
+  border-radius: 6px; padding: 4px 10px;
+  color: var(--ink2); cursor: pointer;
+}
+.filter-actions button:active { background: var(--rule); }
+
+.filter-checkboxes {
+  display: flex; flex-wrap: wrap; gap: 8px 16px;
+}
+.filter-checkboxes label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 14px; color: var(--ink);
+  cursor: pointer; white-space: nowrap;
+}
+.filter-checkboxes input[type=checkbox] {
+  width: 16px; height: 16px;
+  accent-color: var(--accent); cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ─── BOOKMARKS screen ─────────────────────────────────────── */
+.bk-empty {
+  padding: 60px 24px;
+  text-align: center; color: var(--ink2); font-size: 15px;
+}
+
+/* ─── Full post sheet ──────────────────────────────────────── */
+.post-sheet {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  z-index: 100;
+  display: flex; flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
+}
+.post-sheet.open { transform: translateY(0); }
+
+.sheet-header {
+  flex-shrink: 0;
+  padding-top: calc(var(--safe-top) + 12px);
+  padding-left: 18px; padding-right: 18px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+  display: flex; align-items: center; gap: 10px;
+}
+.sheet-back {
+  background: none; border: none;
+  font-size: 22px; cursor: pointer; padding: 0;
+  color: var(--ink2); line-height: 1;
+}
+.sheet-meta { flex: 1; min-width: 0; }
+.sheet-member {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 11px; color: var(--ink3); margin-bottom: 2px;
+}
+.sheet-title {
+  font-size: 16px; font-weight: 600;
+  color: var(--ink); line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sheet-bk-btn {
+  background: none; border: none; font-size: 22px;
+  cursor: pointer; padding: 0; flex-shrink: 0;
+  color: var(--ink3);
+}
+.sheet-bk-btn.saved { color: var(--accent); }
+
+.sheet-body {
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 20px 18px calc(var(--safe-bottom) + 20px);
+}
+.sheet-date {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 11px; color: var(--ink3);
+  margin-bottom: 18px;
+}
+.sheet-text {
+  font-size: 16px; line-height: 1.85;
+  color: var(--ink); white-space: pre-wrap;
+  word-break: break-word;
+}
+.sheet-link {
+  display: block; margin-top: 24px;
+  text-align: center;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 12px; color: var(--accent);
+  text-decoration: none;
+  padding: 12px;
+  border: 1px solid var(--accent-bg);
+  border-radius: 8px;
+  background: var(--accent-bg);
+}
+
+/* ─── Toast notification ───────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: calc(var(--tab-h) + var(--safe-bottom) + 14px);
+  left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--ink);
+  color: var(--bg);
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 13px; letter-spacing: 0.02em;
+  padding: 10px 18px;
+  border-radius: 20px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 500;
+  max-width: calc(100vw - 48px);
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ─── Hidden file inputs ───────────────────────────────────── */
+#json-input { display: none; }
+
+/* ─── Load overlay ─────────────────────────────────────────── */
+#load-overlay {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  z-index: 200;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 18px; padding: 40px 32px;
+  text-align: center;
+}
+#load-overlay .lo-logo { font-size: 48px; }
+#load-overlay h2 {
+  font-size: 22px; font-weight: 600; margin: 0;
+  color: var(--ink);
+}
+#load-overlay p {
+  font-size: 14px; color: var(--ink2);
+  line-height: 1.65; margin: 0;
+}
+#load-overlay button {
+  width: 100%;
+  background: var(--ink); color: var(--bg);
+  border: none; border-radius: 12px;
+  padding: 16px; font-size: 16px;
+  font-family: "Hiragino Mincho ProN", Georgia, serif;
+  cursor: pointer; margin-top: 8px;
+}
+#load-overlay button:active { opacity: 0.8; }
+#load-overlay .lo-hint {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 11px; color: var(--ink3);
+  letter-spacing: 0.04em;
+}
+</style>
+</head>
+<body>
+
+<input type="file" id="json-input" accept=".json">
+
+<!-- Toast notification -->
+<div class="toast" id="toast"></div>
+
+<!-- Full post sheet (slides up) -->
+<div class="post-sheet" id="post-sheet">
+  <div class="sheet-header">
+    <button class="sheet-back" id="sheet-back">‹</button>
+    <div class="sheet-meta">
+      <div class="sheet-member" id="sheet-member"></div>
+      <div class="sheet-title" id="sheet-title"></div>
+    </div>
+    <button class="sheet-bk-btn" id="sheet-bk-btn">🔖</button>
+  </div>
+  <div class="sheet-body">
+    <div class="sheet-date" id="sheet-date"></div>
+    <div class="sheet-text" id="sheet-text"></div>
+    <a class="sheet-link" id="sheet-link" target="_blank" rel="noopener">公式サイトで見る →</a>
+  </div>
+</div>
+
+<!-- Load overlay (shown until json is loaded) -->
+<div id="load-overlay">
+  <div class="lo-logo">📖</div>
+  <h2>ひなブログ</h2>
+  <p>日向坂46 公式ブログ<br>アーカイブリーダー</p>
+  <button id="lo-load-btn">search_index.json を読み込む</button>
+  <div class="lo-hint">Mac で --export を実行してから<br>このファイルを選択してください</div>
+</div>
+
+<!-- Main app shell -->
+<div id="app">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <h1 id="top-title">ひなブログ</h1>
+    <button class="load-btn" id="top-reload-btn">再読み込み</button>
+  </div>
+
+  <!-- Screens -->
+  <div class="screens">
+
+    <!-- HOME screen -->
+    <div class="screen active" id="screen-home">
+      <div class="member-scroll" id="member-scroll"></div>
+      <div class="section-label" id="home-label"></div>
+      <div class="post-list" id="home-list"></div>
+    </div>
+
+    <!-- SEARCH screen -->
+    <div class="screen" id="screen-search">
+      <div class="search-bar-wrap">
+        <div class="search-input-row">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search-input" placeholder="キーワードを入力…" autocomplete="off" autocorrect="off">
+          <button class="clear-btn" id="search-clear">✕</button>
+        </div>
+      </div>
+      <!-- Member filter -->
+      <button class="filter-toggle" id="filter-toggle">
+        <span>
+          メンバーを絞り込む
+          <span class="filter-badge" id="filter-badge"></span>
+        </span>
+        <span class="filter-chevron">▾</span>
+      </button>
+      <div class="filter-panel" id="filter-panel">
+        <div class="filter-inner">
+          <div class="filter-actions">
+            <button id="filter-all">すべて選択</button>
+            <button id="filter-none">すべて解除</button>
+          </div>
+          <div class="filter-checkboxes" id="filter-checkboxes"></div>
+        </div>
+      </div>
+      <div class="search-meta" id="search-meta"></div>
+      <div class="post-list" id="search-list"></div>
+    </div>
+
+    <!-- BOOKMARKS screen -->
+    <div class="screen" id="screen-bookmarks">
+      <div class="section-label" style="border-top: none; padding-top: 16px;">保存した記事</div>
+      <div class="post-list" id="bk-list"></div>
+      <div class="bk-empty" id="bk-empty" style="display:none;">
+        記事の 🔖 をタップして<br>ブックマークに追加できます
+      </div>
+    </div>
+
+  </div><!-- /screens -->
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab active" data-screen="home">
+      <span class="tab-icon">🏠</span>
+      <span class="tab-label">ホーム</span>
+    </button>
+    <button class="tab" data-screen="search">
+      <span class="tab-icon">🔍</span>
+      <span class="tab-label">検索</span>
+    </button>
+    <button class="tab" data-screen="bookmarks">
+      <span class="tab-icon">🔖</span>
+      <span class="tab-label">ブックマーク</span>
+    </button>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+// ─── Data ────────────────────────────────────────────────────
+let POSTS = [];
+let BOOKMARKS = loadBookmarks();
+
+// ─── Member colour palette ───────────────────────────────────
+// 12 distinct soft hues; members get assigned in order of post count.
+const PALETTES = [
+  { bg: "#F5E8E4", fg: "#8B3A2A" },
+  { bg: "#E8F0E4", fg: "#3A6B35" },
+  { bg: "#E4EBF5", fg: "#2A468B" },
+  { bg: "#F5EFE4", fg: "#8B6B2A" },
+  { bg: "#F0E4F5", fg: "#6B2A8B" },
+  { bg: "#E4F5F0", fg: "#2A8B72" },
+  { bg: "#F5E4E4", fg: "#8B2A2A" },
+  { bg: "#E4F5E8", fg: "#2A8B46" },
+  { bg: "#EAE4F5", fg: "#3D2A8B" },
+  { bg: "#F5F0E4", fg: "#8B7A2A" },
+  { bg: "#E4F5F5", fg: "#2A8B8B" },
+  { bg: "#F5E4F0", fg: "#8B2A6B" },
+];
+
+const memberColour = {};
+function assignColours(members) {
+  members.forEach((m, i) => {
+    memberColour[m] = PALETTES[i % PALETTES.length];
+  });
+}
+
+function memberTag(name) {
+  const c = memberColour[name] || { bg: "#F0EDE8", fg: "#5A5550" };
+  return `<span class="mtag" style="background:${c.bg};color:${c.fg}">${esc(name)}</span>`;
+}
+
+// ─── Toast ───────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg) {
+  const toast = document.getElementById("toast");
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 2000);
+}
+
+// ─── Bookmarks ───────────────────────────────────────────────
+function loadBookmarks() {
+  try { return JSON.parse(localStorage.getItem("hinablog_bk") || "[]"); }
+  catch { return []; }
+}
+function saveBookmarks() {
+  localStorage.setItem("hinablog_bk", JSON.stringify(BOOKMARKS));
+}
+function postKey(p) { return p.url || (p.date + p.title); }
+function isBookmarked(p) { return BOOKMARKS.some(b => b.key === postKey(p)); }
+function toggleBookmark(p) {
+  const key = postKey(p);
+  const idx = BOOKMARKS.findIndex(b => b.key === key);
+  if (idx === -1) {
+    BOOKMARKS.unshift({ key, title: p.title, date: p.date, member: p.member, url: p.url, body: p.body });
+    showToast("🔖 ブックマークに追加しました");
+  } else {
+    BOOKMARKS.splice(idx, 1);
+    showToast("ブックマークから削除しました");
+  }
+  saveBookmarks();
+  refreshBookmarkButtons(key);
+  renderBookmarksScreen();
+}
+function refreshBookmarkButtons(key) {
+  document.querySelectorAll(`[data-bk-key="${CSS.escape(key)}"]`).forEach(btn => {
+    btn.classList.toggle("saved", isBookmarked({ url: key }));
+  });
+}
+
+// ─── Utilities ───────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function highlight(text, keyword) {
+  if (!keyword) return esc(text);
+  try {
+    const pat = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    return esc(text).replace(pat, m => `<mark>${m}</mark>`);
+  } catch { return esc(text); }
+}
+function snippet(body, keyword, chars = 80) {
+  if (!keyword) return body.slice(0, 80).replace(/\n/g, " ");
+  const norm = body.toLowerCase();
+  const kn = keyword.toLowerCase();
+  const idx = norm.indexOf(kn);
+  if (idx === -1) return body.slice(0, 80).replace(/\n/g, " ");
+  const s = Math.max(0, idx - chars / 2);
+  const e = Math.min(body.length, idx + keyword.length + chars / 2);
+  return (s > 0 ? "…" : "") + body.slice(s, e).replace(/\n/g, " ") + (e < body.length ? "…" : "");
+}
+function formatDate(d) { return d ? d.replace(/-/g, "·").replace(" ", "  ") : ""; }
+
+// ─── Render a post card ──────────────────────────────────────
+function makeCard(post, keyword) {
+  const key = postKey(post);
+  const bk = isBookmarked(post);
+  const snip = snippet(post.body, keyword);
+
+  const card = document.createElement("div");
+  card.className = "post-card";
+  card.innerHTML = `
+    <div class="card-top">
+      <span class="card-date">${esc(formatDate(post.date))}</span>
+      ${memberTag(post.member)}
+      <button class="card-bookmark-btn ${bk ? "saved" : ""}" data-bk-key="${esc(key)}" aria-label="ブックマーク">🔖</button>
+    </div>
+    <div class="card-title">${highlight(post.title, keyword)}</div>
+    <div class="card-snippet">${highlight(snip, keyword)}</div>
+  `;
+  card.querySelector(".card-bookmark-btn").addEventListener("click", e => {
+    e.stopPropagation();
+    toggleBookmark(post);
+  });
+  card.addEventListener("click", () => openPost(post, keyword));
+  return card;
+}
+
+// ─── Open full post sheet ────────────────────────────────────
+let currentPost = null;
+function openPost(post, keyword) {
+  currentPost = post;
+  const key = postKey(post);
+  document.getElementById("sheet-member").innerHTML = memberTag(post.member);
+  document.getElementById("sheet-title").textContent = post.title;
+  document.getElementById("sheet-date").textContent = formatDate(post.date);
+  document.getElementById("sheet-text").textContent = post.body;
+  const linkEl = document.getElementById("sheet-link");
+  if (post.url) { linkEl.href = post.url; linkEl.style.display = "block"; }
+  else { linkEl.style.display = "none"; }
+  const bkBtn = document.getElementById("sheet-bk-btn");
+  bkBtn.dataset.bkKey = key;
+  bkBtn.classList.toggle("saved", isBookmarked(post));
+  document.getElementById("post-sheet").classList.add("open");
+  document.getElementById("post-sheet").querySelector(".sheet-body").scrollTop = 0;
+}
+document.getElementById("sheet-back").addEventListener("click", () => {
+  document.getElementById("post-sheet").classList.remove("open");
+});
+document.getElementById("sheet-bk-btn").addEventListener("click", () => {
+  if (!currentPost) return;
+  toggleBookmark(currentPost);
+  document.getElementById("sheet-bk-btn").classList.toggle("saved", isBookmarked(currentPost));
+});
+
+// ─── HOME screen ─────────────────────────────────────────────
+let activeHome = "__all__";
+
+function renderHome() {
+  const members = [...new Set(POSTS.map(p => p.member))];
+  const scroll = document.getElementById("member-scroll");
+  scroll.innerHTML = "";
+
+  // "全員" chip
+  const allChip = document.createElement("button");
+  allChip.className = "member-chip" + (activeHome === "__all__" ? " active" : "");
+  allChip.textContent = "全員";
+  allChip.addEventListener("click", () => { activeHome = "__all__"; renderHome(); });
+  scroll.appendChild(allChip);
+
+  members.forEach(m => {
+    const chip = document.createElement("button");
+    chip.className = "member-chip" + (activeHome === m ? " active" : "");
+    chip.textContent = m;
+    chip.addEventListener("click", () => { activeHome = m; renderHome(); });
+    scroll.appendChild(chip);
+  });
+
+  const filtered = activeHome === "__all__" ? POSTS : POSTS.filter(p => p.member === activeHome);
+  document.getElementById("home-label").textContent =
+    activeHome === "__all__"
+      ? `最新記事 ${filtered.length}件`
+      : `${activeHome}  ${filtered.length}件`;
+
+  const list = document.getElementById("home-list");
+  list.innerHTML = "";
+  filtered.slice(0, 100).forEach(p => list.appendChild(makeCard(p, "")));
+}
+
+// ─── SEARCH screen ───────────────────────────────────────────
+let searchTimer = null;
+let searchChecked = new Set(); // empty = all members checked
+const searchInput = document.getElementById("search-input");
+const searchClear = document.getElementById("search-clear");
+const filterToggle = document.getElementById("filter-toggle");
+const filterPanel = document.getElementById("filter-panel");
+const filterBadge = document.getElementById("filter-badge");
+const filterCheckboxes = document.getElementById("filter-checkboxes");
+const filterAllBtn = document.getElementById("filter-all");
+const filterNoneBtn = document.getElementById("filter-none");
+
+filterToggle.addEventListener("click", () => {
+  filterToggle.classList.toggle("open");
+  filterPanel.classList.toggle("open");
+});
+
+filterAllBtn.addEventListener("click", () => {
+  filterCheckboxes.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = true);
+  searchChecked = getSearchChecked();
+  updateFilterBadge();
+  runSearch(searchInput.value.trim());
+});
+
+filterNoneBtn.addEventListener("click", () => {
+  filterCheckboxes.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = false);
+  searchChecked = new Set();
+  updateFilterBadge();
+  runSearch(searchInput.value.trim());
+});
+
+function getSearchChecked() {
+  const s = new Set();
+  filterCheckboxes.querySelectorAll("input[type=checkbox]").forEach(cb => {
+    if (cb.checked) s.add(cb.value);
+  });
+  return s;
+}
+
+function updateFilterBadge() {
+  const total = filterCheckboxes.querySelectorAll("input[type=checkbox]").length;
+  const checked = searchChecked.size;
+  const isAll = checked === total;
+  filterBadge.textContent = isAll ? "" : `${checked}/${total}`;
+  filterBadge.classList.toggle("visible", !isAll && checked > 0);
+}
+
+function buildSearchCheckboxes() {
+  const members = [...new Set(POSTS.map(p => p.member))];
+  filterCheckboxes.innerHTML = "";
+  members.forEach(m => {
+    const lbl = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.value = m;
+    cb.checked = true;
+    cb.addEventListener("change", () => {
+      searchChecked = getSearchChecked();
+      updateFilterBadge();
+      runSearch(searchInput.value.trim());
+    });
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(m));
+    filterCheckboxes.appendChild(lbl);
+  });
+  searchChecked = getSearchChecked();
+}
+
+searchInput.addEventListener("input", () => {
+  const kw = searchInput.value.trim();
+  searchClear.classList.toggle("visible", kw.length > 0);
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => runSearch(kw), 200);
+});
+searchClear.addEventListener("click", () => {
+  searchInput.value = "";
+  searchClear.classList.remove("visible");
+  runSearch("");
+  searchInput.focus();
+});
+
+function runSearch(kw) {
+  const list = document.getElementById("search-list");
+  const meta = document.getElementById("search-meta");
+  list.innerHTML = "";
+
+  if (!kw) {
+    meta.textContent = "";
+    list.innerHTML = `<div class="state-msg" style="padding-top:40px;">キーワードを入力してください</div>`;
+    return;
+  }
+
+  // Apply member filter — if no checkboxes are checked show nothing
+  const total = filterCheckboxes.querySelectorAll("input[type=checkbox]").length;
+  const allChecked = searchChecked.size === total;
+  const pool = allChecked ? POSTS : POSTS.filter(p => searchChecked.has(p.member));
+
+  if (pool.length === 0) {
+    meta.textContent = "メンバーが選択されていません";
+    list.innerHTML = `<div class="state-msg" style="padding-top:30px;">メンバーを選択してください</div>`;
+    return;
+  }
+
+  const norm = kw.toLowerCase();
+  const results = pool.filter(p =>
+    (p.title + " " + p.body).toLowerCase().includes(norm)
+  );
+
+  const scope = allChecked ? "" : ` (${searchChecked.size}名)`;
+  meta.textContent = `「${kw}」を含む記事 ${results.length}件${scope}`;
+
+  if (results.length === 0) {
+    list.innerHTML = `<div class="state-msg" style="padding-top:30px;">見つかりませんでした</div>`;
+    return;
+  }
+  results.slice(0, 200).forEach(p => list.appendChild(makeCard(p, kw)));
+}
+
+// ─── BOOKMARKS screen ────────────────────────────────────────
+function renderBookmarksScreen() {
+  const list = document.getElementById("bk-list");
+  const empty = document.getElementById("bk-empty");
+  list.innerHTML = "";
+  if (BOOKMARKS.length === 0) {
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  // Bookmarks stored as full post objects
+  BOOKMARKS.forEach(b => {
+    list.appendChild(makeCard(b, ""));
+  });
+  // Update tab badge
+  const bkTab = document.querySelector('[data-screen="bookmarks"] .tab-label');
+  if (bkTab) bkTab.textContent = BOOKMARKS.length > 0 ? `ブックマーク ${BOOKMARKS.length}` : "ブックマーク";
+}
+
+// ─── Tab navigation ──────────────────────────────────────────
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    const target = tab.dataset.screen;
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById("screen-" + target).classList.add("active");
+    document.getElementById("top-title").textContent =
+      target === "home" ? "ひなブログ" :
+      target === "search" ? "検索" : "ブックマーク";
+
+    if (target === "search") setTimeout(() => searchInput.focus(), 100);
+    if (target === "bookmarks") renderBookmarksScreen();
+  });
+});
+
+// ─── JSON loading ────────────────────────────────────────────
+function loadJSON(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data) || data.length === 0) throw new Error("empty");
+      POSTS = data.sort((a, b) => b.date > a.date ? 1 : -1);
+      const memberOrder = [...new Set(POSTS.map(p => p.member))];
+      assignColours(memberOrder);
+      document.getElementById("load-overlay").style.display = "none";
+      buildSearchCheckboxes();
+      renderHome();
+      renderBookmarksScreen();
+      runSearch(searchInput.value.trim());
+    } catch {
+      alert("search_index.json の読み込みに失敗しました。ファイルを確認してください。");
+    }
+  };
+  reader.readAsText(file, "utf-8");
+}
+
+const jsonInput = document.getElementById("json-input");
+jsonInput.addEventListener("change", () => {
+  if (jsonInput.files[0]) loadJSON(jsonInput.files[0]);
+});
+
+document.getElementById("lo-load-btn").addEventListener("click", () => jsonInput.click());
+document.getElementById("top-reload-btn").addEventListener("click", () => jsonInput.click());
+
+// Close sheet with swipe down
+let touchStartY = 0;
+const sheet = document.getElementById("post-sheet");
+sheet.addEventListener("touchstart", e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+sheet.addEventListener("touchend", e => {
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (dy > 80 && e.changedTouches[0].clientY < 200) {
+    sheet.classList.remove("open");
+  }
+}, { passive: true });
+</script>
+</body>
+</html>
