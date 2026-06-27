@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="ひなブログ">
+<meta name="apple-mobile-web-app-title" content="日向坂ブログ">
 <meta name="theme-color" content="#1A1714">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231A1714'/><text x='50' y='72' text-anchor='middle' font-size='60'>📖</text></svg>">
-<title>ひなブログ</title>
+<title>日向坂ブログ</title>
 <style>
 :root {
   --bg:        #FAFAF8;
@@ -469,7 +469,7 @@ html, body {
 <!-- Load overlay (shown until json is loaded) -->
 <div id="load-overlay">
   <div class="lo-logo">📖</div>
-  <h2>ひなブログ</h2>
+  <h2>日向坂ブログ</h2>
   <p>日向坂46 公式ブログ<br>アーカイブリーダー</p>
   <button id="lo-load-btn">search_index.json を読み込む</button>
   <div class="lo-hint">Mac で --export を実行してから<br>このファイルを選択してください</div>
@@ -480,7 +480,7 @@ html, body {
 
   <!-- Top bar -->
   <div class="top-bar">
-    <h1 id="top-title">ひなブログ</h1>
+    <h1 id="top-title">日向坂ブログ</h1>
     <button class="load-btn" id="top-reload-btn">再読み込み</button>
   </div>
 
@@ -882,7 +882,7 @@ document.querySelectorAll(".tab").forEach(tab => {
     tab.classList.add("active");
     document.getElementById("screen-" + target).classList.add("active");
     document.getElementById("top-title").textContent =
-      target === "home" ? "ひなブログ" :
+      target === "home" ? "日向坂ブログ" :
       target === "search" ? "検索" : "ブックマーク";
 
     if (target === "search") setTimeout(() => searchInput.focus(), 100);

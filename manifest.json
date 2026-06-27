@@ -1,6 +1,6 @@
 {
-  "name": "ひなブログ",
-  "short_name": "ひなブログ",
+  "name": "日向坂ブログ",
+  "short_name": "日向坂ブログ",
   "description": "日向坂46 公式ブログ アーカイブリーダー",
   "start_url": "./Hinatazaka_blog_mobile.html",
   "display": "standalone",
