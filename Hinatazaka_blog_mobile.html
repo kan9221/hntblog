@@ -89,6 +89,32 @@ html, body {
 }
 .screen.active { display: block; }
 
+/* ─── Scroll jump button ───────────────────────────────────── */
+.scroll-btn {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--tab-h) + var(--safe-bottom) + 12px);
+  width: 40px; height: 40px;
+  background: var(--ink);
+  color: var(--bg);
+  border: none; border-radius: 50%;
+  font-size: 18px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.8);
+  transition: opacity 0.2s ease, transform 0.2s ease, background 0.15s ease;
+  z-index: 50;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+.scroll-btn.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+.scroll-btn:active { background: var(--accent); transform: scale(0.92); }
+
 /* ─── Tab bar ──────────────────────────────────────────────── */
 .tab-bar {
   flex-shrink: 0;
@@ -469,6 +495,9 @@ html, body {
   <div class="lo-hint" id="lo-hint"></div>
 </div>
 
+<!-- Scroll jump button (↓ / ↑) -->
+<button class="scroll-btn" id="scroll-btn" aria-label="スクロール">↓</button>
+
 <!-- Main app shell -->
 <div id="app">
 
@@ -727,6 +756,7 @@ function renderHome() {
   const list = document.getElementById("home-list");
   list.innerHTML = "";
   filtered.slice(0, 100).forEach(p => list.appendChild(makeCard(p, "")));
+  updateScrollBtn();
 }
 
 // ─── SEARCH screen ───────────────────────────────────────────
@@ -845,6 +875,7 @@ function runSearch(kw) {
     return;
   }
   results.slice(0, 200).forEach(p => list.appendChild(makeCard(p, kw)));
+  setTimeout(updateScrollBtn, 50);
 }
 
 // ─── BOOKMARKS screen ────────────────────────────────────────
@@ -866,20 +897,64 @@ function renderBookmarksScreen() {
   if (bkTab) bkTab.textContent = BOOKMARKS.length > 0 ? `ブックマーク ${BOOKMARKS.length}` : "ブックマーク";
 }
 
-// ─── Tab navigation ──────────────────────────────────────────
+// ─── Scroll jump button ──────────────────────────────────────
+const scrollBtn = document.getElementById("scroll-btn");
+let activeScreenEl = document.getElementById("screen-home");
+
+function updateScrollBtn() {
+  const el = activeScreenEl;
+  if (!el) return;
+  const scrolled = el.scrollTop;
+  const maxScroll = el.scrollHeight - el.clientHeight;
+  if (maxScroll < 80) {
+    // Page is too short to need scrolling
+    scrollBtn.classList.remove("visible");
+    return;
+  }
+  scrollBtn.classList.add("visible");
+  // Show ↑ once scrolled more than 30% down, otherwise ↓
+  if (scrolled > maxScroll * 0.3) {
+    scrollBtn.textContent = "↑";
+  } else {
+    scrollBtn.textContent = "↓";
+  }
+}
+
+scrollBtn.addEventListener("click", () => {
+  const el = activeScreenEl;
+  if (!el) return;
+  const maxScroll = el.scrollHeight - el.clientHeight;
+  if (scrollBtn.textContent === "↓") {
+    el.scrollTo({ top: maxScroll, behavior: "smooth" });
+  } else {
+    el.scrollTo({ top: 0, behavior: "smooth" });
+  }
+});
+
+// Attach scroll listener to all screens
+document.querySelectorAll(".screen").forEach(screen => {
+  screen.addEventListener("scroll", updateScrollBtn, { passive: true });
+});
+
+
 document.querySelectorAll(".tab").forEach(tab => {
   tab.addEventListener("click", () => {
     const target = tab.dataset.screen;
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
     document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
     tab.classList.add("active");
-    document.getElementById("screen-" + target).classList.add("active");
+    const screenEl = document.getElementById("screen-" + target);
+    screenEl.classList.add("active");
+    activeScreenEl = screenEl;
     document.getElementById("top-title").textContent =
       target === "home" ? "日向坂ブログ" :
       target === "search" ? "検索" : "ブックマーク";
 
     if (target === "search") setTimeout(() => searchInput.focus(), 100);
     if (target === "bookmarks") renderBookmarksScreen();
+
+    // Reset scroll button for the newly active screen
+    updateScrollBtn();
   });
 });
 
