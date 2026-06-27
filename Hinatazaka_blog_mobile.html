@@ -404,9 +404,6 @@ html, body {
   transform: translateX(-50%) translateY(0);
 }
 
-/* ─── Hidden file inputs ───────────────────────────────────── */
-#json-input { display: none; }
-
 /* ─── Load overlay ─────────────────────────────────────────── */
 #load-overlay {
   position: fixed; inset: 0;
@@ -444,8 +441,6 @@ html, body {
 </head>
 <body>
 
-<input type="file" id="json-input" accept=".json">
-
 <!-- Toast notification -->
 <div class="toast" id="toast"></div>
 
@@ -466,13 +461,12 @@ html, body {
   </div>
 </div>
 
-<!-- Load overlay (shown until json is loaded) -->
+<!-- Load overlay (shown while fetching from Firestore) -->
 <div id="load-overlay">
   <div class="lo-logo">📖</div>
   <h2>日向坂ブログ</h2>
-  <p>日向坂46 公式ブログ<br>アーカイブリーダー</p>
-  <button id="lo-load-btn">search_index.json を読み込む</button>
-  <div class="lo-hint">Mac で --export を実行してから<br>このファイルを選択してください</div>
+  <p id="lo-status">データを読み込んでいます…</p>
+  <div class="lo-hint" id="lo-hint"></div>
 </div>
 
 <!-- Main app shell -->
@@ -481,7 +475,6 @@ html, body {
   <!-- Top bar -->
   <div class="top-bar">
     <h1 id="top-title">日向坂ブログ</h1>
-    <button class="load-btn" id="top-reload-btn">再読み込み</button>
   </div>
 
   <!-- Screens -->
@@ -890,35 +883,82 @@ document.querySelectorAll(".tab").forEach(tab => {
   });
 });
 
-// ─── JSON loading ────────────────────────────────────────────
-function loadJSON(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (!Array.isArray(data) || data.length === 0) throw new Error("empty");
-      POSTS = data.sort((a, b) => b.date > a.date ? 1 : -1);
-      const memberOrder = [...new Set(POSTS.map(p => p.member))];
-      assignColours(memberOrder);
-      document.getElementById("load-overlay").style.display = "none";
-      buildSearchCheckboxes();
-      renderHome();
-      renderBookmarksScreen();
-      runSearch(searchInput.value.trim());
-    } catch {
-      alert("search_index.json の読み込みに失敗しました。ファイルを確認してください。");
-    }
-  };
-  reader.readAsText(file, "utf-8");
+// ─── Turso loading ───────────────────────────────────────────
+// Reads all posts from Turso via its HTTP API — no SDK needed,
+// works anywhere including GitHub Pages with no CSP issues.
+// Uses the read-only token so it is safe to embed in public HTML.
+
+const TURSO_URL   = "https://hntblog-kan9221.aws-us-west-2.turso.io";
+const TURSO_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicm8iLCJpYXQiOjE3ODI1NzEzNTIsImlkIjoiMDE5ZjA5ODctMTAwMS03YzBiLTgwOTUtYzE0MzliYTRhODQ2IiwicmlkIjoiMTEwNTMzNmQtOTVlNy00NWNjLTlkNjQtOThiYTU3ODA5OWFjIn0.tBEsRrpSy0HYZlnaWXcyqkK2uieo1RabXk6-JuLoCLy-hiXzqwsfUtl_TiK6IN8CZkA-V0SqEIp1DxkAf_a4Aw";
+
+function initApp(data) {
+  if (!Array.isArray(data) || data.length === 0) {
+    document.getElementById("lo-status").textContent = "記事が見つかりませんでした。";
+    document.getElementById("lo-hint").textContent = "sync スクリプトで記事を同期してください。";
+    return;
+  }
+  POSTS = data.sort((a, b) => b.date > a.date ? 1 : -1);
+  const memberOrder = [...new Set(POSTS.map(p => p.member))];
+  assignColours(memberOrder);
+  document.getElementById("load-overlay").style.display = "none";
+  buildSearchCheckboxes();
+  renderHome();
+  renderBookmarksScreen();
+  runSearch(searchInput.value.trim());
 }
 
-const jsonInput = document.getElementById("json-input");
-jsonInput.addEventListener("change", () => {
-  if (jsonInput.files[0]) loadJSON(jsonInput.files[0]);
-});
+async function loadFromTurso() {
+  const loStatus = document.getElementById("lo-status");
+  const loHint   = document.getElementById("lo-hint");
+  loStatus.textContent = "データベースから記事を読み込んでいます…";
 
-document.getElementById("lo-load-btn").addEventListener("click", () => jsonInput.click());
-document.getElementById("top-reload-btn").addEventListener("click", () => jsonInput.click());
+  try {
+    const res = await fetch(`${TURSO_URL}/v2/pipeline`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${TURSO_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        requests: [
+          { type: "execute", stmt: { sql: "SELECT post_id, title, date, member, url, body FROM posts" } },
+          { type: "close" }
+        ]
+      })
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+
+    const json = await res.json();
+    const result = json.results[0];
+    if (result.type === "error") throw new Error(result.error.message);
+
+    const cols = result.response.result.cols.map(c => c.name);
+    const rows = result.response.result.rows;
+
+    const posts = rows.map(row => {
+      const obj = {};
+      cols.forEach((col, i) => { obj[col] = row[i].value; });
+      return {
+        title:  obj.title  || "(無題)",
+        date:   obj.date   || "",
+        member: obj.member || "",
+        url:    obj.url    || "",
+        body:   obj.body   || "",
+      };
+    });
+
+    loStatus.textContent = `${posts.length}件の記事を読み込みました`;
+    initApp(posts);
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById("lo-status").textContent = "読み込みに失敗しました";
+    document.getElementById("lo-hint").textContent = err.message;
+  }
+}
+
+loadFromTurso();
 
 // Close sheet with swipe down
 let touchStartY = 0;
