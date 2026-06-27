@@ -384,6 +384,7 @@ html, body {
 .sheet-body {
   flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
   padding: 20px 18px calc(var(--safe-bottom) + 20px);
+  position: relative;
 }
 .sheet-date {
   font-family: "SF Mono", Menlo, monospace;
@@ -391,9 +392,18 @@ html, body {
   margin-bottom: 18px;
 }
 .sheet-text {
-  font-size: 16px; line-height: 1.85;
-  color: var(--ink); white-space: pre-wrap;
+  /* Match the official site's thin rounded gothic style:
+     Hiragino Sans W2 on iOS, Noto Sans thin weight as fallback.
+     Light colour and generous line-height mirror the screenshot. */
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+               "Noto Sans JP", "Yu Gothic", sans-serif;
+  font-weight: 300;
+  font-size: 15px;
+  line-height: 2.1;
+  color: #888;
+  white-space: pre-wrap;
   word-break: break-word;
+  letter-spacing: 0.03em;
 }
 .sheet-link {
   display: block; margin-top: 24px;
@@ -407,7 +417,13 @@ html, body {
   background: var(--accent-bg);
 }
 
-/* ─── Toast notification ───────────────────────────────────── */
+/* Scroll button inside the post sheet */
+#sheet-scroll-btn {
+  bottom: calc(var(--safe-bottom) + 16px);
+  right: 16px;
+}
+
+
 .toast {
   position: fixed;
   bottom: calc(var(--tab-h) + var(--safe-bottom) + 14px);
@@ -480,11 +496,13 @@ html, body {
     </div>
     <button class="sheet-bk-btn" id="sheet-bk-btn">🔖</button>
   </div>
-  <div class="sheet-body">
+  <div class="sheet-body" id="sheet-body">
     <div class="sheet-date" id="sheet-date"></div>
     <div class="sheet-text" id="sheet-text"></div>
     <a class="sheet-link" id="sheet-link" target="_blank" rel="noopener">公式サイトで見る →</a>
   </div>
+  <!-- Scroll button inside the sheet -->
+  <button class="scroll-btn" id="sheet-scroll-btn" aria-label="スクロール">↓</button>
 </div>
 
 <!-- Load overlay (shown while fetching from Firestore) -->
@@ -713,10 +731,12 @@ function openPost(post, keyword) {
   bkBtn.dataset.bkKey = key;
   bkBtn.classList.toggle("saved", isBookmarked(post));
   document.getElementById("post-sheet").classList.add("open");
-  document.getElementById("post-sheet").querySelector(".sheet-body").scrollTop = 0;
+  document.getElementById("sheet-body").scrollTop = 0;
+  setTimeout(updateSheetScrollBtn, 50);
 }
 document.getElementById("sheet-back").addEventListener("click", () => {
   document.getElementById("post-sheet").classList.remove("open");
+  sheetScrollBtn.classList.remove("visible");
 });
 document.getElementById("sheet-bk-btn").addEventListener("click", () => {
   if (!currentPost) return;
@@ -897,7 +917,32 @@ function renderBookmarksScreen() {
   if (bkTab) bkTab.textContent = BOOKMARKS.length > 0 ? `ブックマーク ${BOOKMARKS.length}` : "ブックマーク";
 }
 
-// ─── Scroll jump button ──────────────────────────────────────
+// ─── Sheet scroll button ─────────────────────────────────────
+const sheetScrollBtn = document.getElementById("sheet-scroll-btn");
+const sheetBody = document.getElementById("sheet-body");
+
+function updateSheetScrollBtn() {
+  const scrolled = sheetBody.scrollTop;
+  const maxScroll = sheetBody.scrollHeight - sheetBody.clientHeight;
+  if (maxScroll < 80) {
+    sheetScrollBtn.classList.remove("visible");
+    return;
+  }
+  sheetScrollBtn.classList.add("visible");
+  sheetScrollBtn.textContent = scrolled > maxScroll * 0.3 ? "↑" : "↓";
+}
+
+sheetScrollBtn.addEventListener("click", () => {
+  const maxScroll = sheetBody.scrollHeight - sheetBody.clientHeight;
+  sheetBody.scrollTo({
+    top: sheetScrollBtn.textContent === "↓" ? maxScroll : 0,
+    behavior: "smooth"
+  });
+});
+
+sheetBody.addEventListener("scroll", updateSheetScrollBtn, { passive: true });
+
+
 const scrollBtn = document.getElementById("scroll-btn");
 let activeScreenEl = document.getElementById("screen-home");
 
