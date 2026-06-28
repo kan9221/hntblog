@@ -900,8 +900,10 @@ function toggleBookmark(p) {
   const key = postKey(p);
   const idx = BOOKMARKS.findIndex(b => b.key === key);
   if (idx === -1) {
-    // Add immediately with no memo; user can add memo from the bookmark list
-    BOOKMARKS.unshift({ key, title: p.title, date: p.date, member: p.member, url: p.url, body: p.body, memo: "" });
+    // Ask for optional memo using native prompt — no overlay, no iOS keyboard issues
+    const memo = prompt("メモを追加（任意）\n" + p.title, "") ;
+    if (memo === null) return; // user tapped キャンセル → don't bookmark
+    BOOKMARKS.unshift({ key, title: p.title, date: p.date, member: p.member, url: p.url, body: p.body, memo: memo.trim() });
     saveBookmarks();
     refreshBookmarkButtons(key);
     renderBookmarksScreen();
