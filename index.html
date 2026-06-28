@@ -514,6 +514,8 @@ html, body {
   display: flex; align-items: flex-end;
   opacity: 0; pointer-events: none;
   transition: opacity 0.2s ease;
+  /* Prevent iOS from resizing the viewport when keyboard appears */
+  -webkit-overflow-scrolling: touch;
 }
 .memo-sheet.open { opacity: 1; pointer-events: auto; }
 
@@ -521,9 +523,13 @@ html, body {
   width: 100%;
   background: var(--bg);
   border-radius: 16px 16px 0 0;
+  /* Use padding-bottom with safe area so sheet sits above home bar */
   padding: 20px 20px calc(var(--safe-bottom) + 20px);
   transform: translateY(100%);
   transition: transform 0.25s cubic-bezier(0.32,0.72,0,1);
+  /* Allow the inner sheet to scroll if keyboard pushes it */
+  max-height: 80vh;
+  overflow-y: auto;
 }
 .memo-sheet.open .memo-inner { transform: translateY(0); }
 
@@ -923,8 +929,11 @@ function openMemoSheet(post, existingMemo = "") {
   editingBookmarkKey = null;
   memoPostTitle.textContent = post.title;
   memoInput.value = existingMemo;
+  // Lock body scroll to prevent iOS from resizing the viewport
+  document.body.style.overflow = "hidden";
   memoSheet.classList.add("open");
-  setTimeout(() => memoInput.focus(), 300);
+  // Do NOT force-focus the textarea — let user tap it.
+  // Forced focus inside a CSS transition causes iOS to shrink the viewport.
 }
 
 function openMemoEdit(key) {
@@ -934,12 +943,15 @@ function openMemoEdit(key) {
   editingBookmarkKey = key;
   memoPostTitle.textContent = bk.title;
   memoInput.value = bk.memo || "";
+  document.body.style.overflow = "hidden";
   memoSheet.classList.add("open");
-  setTimeout(() => memoInput.focus(), 300);
 }
 
 function closeMemoSheet() {
   memoSheet.classList.remove("open");
+  // Blur textarea first so keyboard dismisses before layout restores
+  memoInput.blur();
+  document.body.style.overflow = "";
   memoInput.value = "";
   pendingBookmarkPost = null;
   editingBookmarkKey = null;
