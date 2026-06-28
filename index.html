@@ -822,12 +822,14 @@ html, body {
       </div>
       <div class="search-meta" id="search-meta"></div>
       <div class="post-list" id="search-list"></div>
+      <div class="pagination" id="search-pagination"></div>
     </div>
 
     <!-- BOOKMARKS screen -->
     <div class="screen" id="screen-bookmarks">
       <div class="section-label" style="border-top: none; padding-top: 16px;">保存した記事</div>
       <div class="post-list" id="bk-list"></div>
+      <div class="pagination" id="bk-pagination"></div>
       <div class="bk-empty" id="bk-empty" style="display:none;">
         記事の 🔖 をタップして<br>ブックマークに追加できます
       </div>
@@ -1107,12 +1109,16 @@ function renderHome(resetPage = true) {
   list.innerHTML = "";
   pagePosts.forEach(p => list.appendChild(makeCard(p, "")));
 
-  renderPagination(totalPages);
+  renderPagination(totalPages, "home-pagination", homePage, (page) => {
+    homePage = page;
+    renderHome(false);
+    document.getElementById("screen-home").scrollTo({ top: 0, behavior: "smooth" });
+  });
   updateScrollBtn();
 }
 
-function renderPagination(totalPages) {
-  const bar = document.getElementById("home-pagination");
+function renderPagination(totalPages, barId, currentPage, onPageChange) {
+  const bar = document.getElementById(barId);
   bar.innerHTML = "";
   if (totalPages <= 1) return;
 
@@ -1128,32 +1134,24 @@ function renderPagination(totalPages) {
     btn.className = "page-btn" + (isActive ? " active" : "");
     btn.textContent = label;
     btn.disabled = isDisabled;
-    btn.addEventListener("click", () => {
-      homePage = page;
-      renderHome(false);
-      // Scroll home screen to top
-      document.getElementById("screen-home").scrollTo({ top: 0, behavior: "smooth" });
-    });
+    btn.addEventListener("click", () => onPageChange(page));
     bar.appendChild(btn);
   }
 
-  // Prev arrow
-  addBtn("‹", homePage - 1, false, homePage === 1);
+  addBtn("‹", currentPage - 1, false, currentPage === 1);
 
-  // Page number logic: always show first, last, current ±1, with ellipsis
-  const pages = new Set([1, totalPages, homePage, homePage - 1, homePage + 1]
+  const pages = new Set([1, totalPages, currentPage, currentPage - 1, currentPage + 1]
     .filter(p => p >= 1 && p <= totalPages));
   const sorted = [...pages].sort((a, b) => a - b);
 
   let prev = 0;
   sorted.forEach(p => {
     if (prev && p - prev > 1) addBtn("…", null, false, true);
-    addBtn(String(p), p, p === homePage, false);
+    addBtn(String(p), p, p === currentPage, false);
     prev = p;
   });
 
-  // Next arrow
-  addBtn("›", homePage + 1, false, homePage === totalPages);
+  addBtn("›", currentPage + 1, false, currentPage === totalPages);
 }
 
 // ─── SEARCH screen ───────────────────────────────────────────
@@ -1237,10 +1235,15 @@ searchClear.addEventListener("click", () => {
   searchInput.focus();
 });
 
-function runSearch(kw) {
+let searchPage = 1;
+let lastSearchResults = [];
+
+function runSearch(kw, resetPage = true) {
+  if (resetPage) searchPage = 1;
   const list = document.getElementById("search-list");
   const meta = document.getElementById("search-meta");
   list.innerHTML = "";
+  document.getElementById("search-pagination").innerHTML = "";
 
   if (!kw) {
     meta.textContent = "";
@@ -1248,7 +1251,6 @@ function runSearch(kw) {
     return;
   }
 
-  // Apply member filter — if no checkboxes are checked show nothing
   const total = filterCheckboxes.querySelectorAll("input[type=checkbox]").length;
   const allChecked = searchChecked.size === total;
   const pool = allChecked ? POSTS : POSTS.filter(p => searchChecked.has(p.member));
@@ -1263,37 +1265,54 @@ function runSearch(kw) {
   const results = pool.filter(p =>
     (p.title + " " + p.body).toLowerCase().includes(norm)
   );
+  lastSearchResults = results;
 
   const scope = allChecked ? "" : ` (${searchChecked.size}名)`;
+  const totalPages = Math.max(1, Math.ceil(results.length / POSTS_PER_PAGE));
+  if (searchPage > totalPages) searchPage = totalPages;
   meta.textContent = `「${kw}」を含む記事 ${results.length}件${scope}`;
 
   if (results.length === 0) {
     list.innerHTML = `<div class="state-msg" style="padding-top:30px;">見つかりませんでした</div>`;
     return;
   }
-  results.slice(0, 200).forEach(p => list.appendChild(makeCard(p, kw)));
+
+  const start = (searchPage - 1) * POSTS_PER_PAGE;
+  results.slice(start, start + POSTS_PER_PAGE).forEach(p => list.appendChild(makeCard(p, kw)));
+
+  renderPagination(totalPages, "search-pagination", searchPage, (page) => {
+    searchPage = page;
+    runSearch(kw, false);
+    document.getElementById("screen-search").scrollTo({ top: 0, behavior: "smooth" });
+  });
   setTimeout(updateScrollBtn, 50);
 }
 
 // ─── BOOKMARKS screen ────────────────────────────────────────
-function renderBookmarksScreen() {
-  const list = document.getElementById("bk-list");
+let bkPage = 1;
+
+function renderBookmarksScreen(resetPage = true) {
+  if (resetPage) bkPage = 1;
+  const list  = document.getElementById("bk-list");
   const empty = document.getElementById("bk-empty");
   list.innerHTML = "";
+  document.getElementById("bk-pagination").innerHTML = "";
+
   if (BOOKMARKS.length === 0) {
     empty.style.display = "block";
     return;
   }
   empty.style.display = "none";
-  BOOKMARKS.forEach(b => {
-    // Card wrapper
+
+  const totalPages = Math.max(1, Math.ceil(BOOKMARKS.length / POSTS_PER_PAGE));
+  if (bkPage > totalPages) bkPage = totalPages;
+  const start = (bkPage - 1) * POSTS_PER_PAGE;
+  const pageBks = BOOKMARKS.slice(start, start + POSTS_PER_PAGE);
+
+  pageBks.forEach(b => {
     const wrap = document.createElement("div");
+    wrap.appendChild(makeCard(b, ""));
 
-    // Post card
-    const card = makeCard(b, "");
-    wrap.appendChild(card);
-
-    // Memo display
     if (b.memo) {
       const memoEl = document.createElement("div");
       memoEl.className = "bk-memo";
@@ -1301,7 +1320,6 @@ function renderBookmarksScreen() {
       wrap.appendChild(memoEl);
     }
 
-    // Edit memo button
     const editBtn = document.createElement("button");
     editBtn.className = "bk-edit-memo";
     editBtn.textContent = b.memo ? "✎ メモを編集" : "✎ メモを追加";
@@ -1311,6 +1329,13 @@ function renderBookmarksScreen() {
 
     list.appendChild(wrap);
   });
+
+  renderPagination(totalPages, "bk-pagination", bkPage, (page) => {
+    bkPage = page;
+    renderBookmarksScreen(false);
+    document.getElementById("screen-bookmarks").scrollTo({ top: 0, behavior: "smooth" });
+  });
+
   const bkTab = document.querySelector('[data-screen="bookmarks"] .tab-label');
   if (bkTab) bkTab.textContent = BOOKMARKS.length > 0 ? `ブックマーク ${BOOKMARKS.length}` : "ブックマーク";
 }
